@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>リアルタイム樹種判別アプリ</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@teachablemachine-image"></script>
+  <style>
+    video { border: 1px solid black; }
+    #label { font-size: 20px; margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <h1>リアルタイム樹種判別</h1>
+  <video id="webcam" autoplay playsinline width="300"></video>
+  <div id="label">判別結果：-</div>
+
+  <script>
+    async function init() {
+      const webcam = document.getElementById('webcam');
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      webcam.srcObject = stream;
+
+      const modelURL = "model/model.json";
+      const metadataURL = "model/metadata.json";
+      const model = await tmImage.load(modelURL, metadataURL);
+
+      // 0.5秒ごとに判別
+      setInterval(async () => {
+        const prediction = await model.predict(webcam);
+        // 一番確率が高いクラスを取得
+        const best = prediction.reduce((a,b) => a.probability > b.probability ? a : b);
+        document.getElementById('label').innerText =
+          `判別結果：${best.className} (${(best.probability*100).toFixed(1)}%)`;
+      }, 500);
+    }
+
+    init();
+  </script>
+</body>
+</html>
