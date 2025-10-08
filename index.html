@@ -2,48 +2,68 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>リアルタイム樹種判別（アウトカメラ固定）</title>
+  <title>リアルタイム樹種判別（アウトカメラ優先）</title>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
   <script src="https://cdn.jsdelivr.net/npm/@teachablemachine-image"></script>
   <style>
     body { font-family: sans-serif; text-align: center; margin-top: 20px; }
     video { border: 1px solid black; width: 300px; height: auto; }
     #label { font-size: 20px; margin-top: 10px; }
+    #cameraSelect { margin-top: 10px; }
   </style>
 </head>
 <body>
   <h1>リアルタイム樹種判別</h1>
   <video id="webcam" autoplay playsinline></video>
   <div id="label">判別結果：-</div>
+  <select id="cameraSelect"></select>
 
   <script>
     const webcam = document.getElementById('webcam');
+    const cameraSelect = document.getElementById('cameraSelect');
     let model;
 
-    // カメラ起動（アウトカメラ固定 + フォールバック）
-    async function startCamera() {
+    async function startCamera(deviceId) {
+      if (webcam.srcObject) {
+        webcam.srcObject.getTracks().forEach(track => track.stop());
+      }
+
+      const constraints = deviceId
+        ? { video: { deviceId: { exact: deviceId } } }
+        : { video: { facingMode: "environment" } }; // 優先アウトカメラ
+
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { exact: "environment" } }
-        });
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
         webcam.srcObject = stream;
       } catch (err) {
-        console.warn("アウトカメラが使用できません。フロントカメラを使用します。", err);
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "user" }
-        });
-        webcam.srcObject = stream;
+        console.warn("カメラ起動エラー:", err);
       }
     }
 
+    async function populateCameraList() {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videoDevices = devices.filter(d => d.kind === "videoinput");
+      cameraSelect.innerHTML = "";
+      videoDevices.forEach(d => {
+        const option = document.createElement("option");
+        option.value = d.deviceId;
+        option.text = d.label || `Camera ${cameraSelect.length+1}`;
+        cameraSelect.appendChild(option);
+      });
+    }
+
+    cameraSelect.addEventListener("change", () => {
+      startCamera(cameraSelect.value);
+    });
+
     async function init() {
-      // Teachable Machine モデルのロード
-      const modelURL = "model/model.json";        
+      // モデルロード
+      const modelURL = "model/model.json";
       const metadataURL = "model/metadata.json";
       model = await tmImage.load(modelURL, metadataURL);
 
-      // カメラ起動
-      await startCamera();
+      await populateCameraList();
+      await startCamera(); // デフォルトはアウトカメラ優先
 
       // 0.5秒ごとに判別
       setInterval(async () => {
