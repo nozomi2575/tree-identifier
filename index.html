@@ -7,38 +7,26 @@
   <style>
     video { border: 1px solid black; }
     #label { font-size: 20px; margin-top: 10px; }
-    #switchCamera { margin-top: 10px; }
   </style>
 </head>
 <body>
-  <h1>リアルタイム樹種判別</h1>
+  <h1>リアルタイム樹種判別（アウトカメラ固定）</h1>
   <video id="webcam" autoplay playsinline width="300"></video>
   <div id="label">判別結果：-</div>
-  <button id="switchCamera">カメラ切替</button>
 
   <script>
-    let useFront = false; // false = アウトカメラ、true = インカメラ
-    let model;
     const webcam = document.getElementById('webcam');
+    let model;
 
     async function startCamera() {
-      if (webcam.srcObject) {
-        // 既存ストリームを停止
-        webcam.srcObject.getTracks().forEach(track => track.stop());
-      }
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: useFront ? "user" : "environment" }
+        video: { facingMode: "environment" } // ここでアウトカメラ固定
       });
       webcam.srcObject = stream;
     }
 
-    document.getElementById('switchCamera').addEventListener('click', async () => {
-      useFront = !useFront;
-      await startCamera();
-    });
-
     async function init() {
-      const modelURL = "model/model.json";        // Teachable Machineからエクスポート
+      const modelURL = "model/model.json";        
       const metadataURL = "model/metadata.json";
       model = await tmImage.load(modelURL, metadataURL);
 
