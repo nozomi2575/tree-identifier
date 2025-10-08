@@ -1,52 +1,91 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <title>Tree Identifier</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>樹種判別アプリ（Android対応）</title>
   <style>
-    body { font-family: sans-serif; text-align: center; background: #f5f5f5; margin: 0; }
-    video { width: 100%; max-width: 600px; border-radius: 12px; margin-top: 20px; }
-    button { margin-top: 20px; padding: 10px 20px; font-size: 16px; }
+    body {
+      font-family: sans-serif;
+      text-align: center;
+      margin: 0;
+      background: #f5f5f5;
+    }
+    video {
+      width: 90%;
+      max-width: 400px;
+      border-radius: 10px;
+      margin-top: 10px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.3);
+    }
+    #label-container {
+      font-size: 1.2em;
+      margin-top: 15px;
+    }
+    button {
+      margin-top: 10px;
+      padding: 10px 20px;
+      font-size: 1em;
+    }
   </style>
 </head>
 <body>
-  <h1>Tree Identifier</h1>
-  <p>カメラを起動して、トドマツなどの樹皮を撮影してください。</p>
+  <h2>🌲 樹種判別アプリ（Android Chrome対応）</h2>
+  <video id="webcam" autoplay playsinline muted></video>
+  <div id="label-container">カメラ準備中...</div>
+  <button id="start-btn">カメラ起動</button>
 
-  <button id="startBtn">カメラを起動</button>
-  <video id="camera" autoplay playsinline></video>
-  <div id="result"></div>
+  <script type="module">
+    import * as tmImage from "https://teachablemachine.withgoogle.com/tfjs-models/image.min.js";
 
-  <script>
-    const video = document.getElementById('camera');
-    const startBtn = document.getElementById('startBtn');
+    const webcamElement = document.getElementById("webcam");
+    const labelContainer = document.getElementById("label-container");
+    const startButton = document.getElementById("start-btn");
+
+    let model;
+
+    async function init() {
+      // 🔸 あなたのTeachable MachineモデルURLをここに貼る
+      const URL = "https://teachablemachine.withgoogle.com/models/YOUR_MODEL_ID/";
+      const modelURL = URL + "model.json";
+      const metadataURL = URL + "metadata.json";
+
+      model = await tmImage.load(modelURL, metadataURL);
+      labelContainer.innerHTML = "カメラ準備OK。樹種を判別します...";
+
+      startPrediction();
+    }
 
     async function startCamera() {
-      startBtn.disabled = true;
-
-      // 利用可能なデバイス一覧を取得
-      const devices = await navigator.mediaDevices.enumerateDevices();
-      const videoDevices = devices.filter(d => d.kind === 'videoinput');
-
-      let constraints = { video: { facingMode: { exact: "environment" } } };
-
-      // “environment” が使えない場合は名前に "back" や "rear" を含むカメラを探す
-      const backCam = videoDevices.find(d => /back|rear/i.test(d.label));
-      if (backCam) {
-        constraints = { video: { deviceId: { exact: backCam.deviceId } } };
-      }
-
       try {
-        const stream = await navigator.mediaDevices.getUserMedia(constraints);
-        video.srcObject = stream;
+        // ✅ Android Chrome ならこの設定でアウトカメラ起動
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { exact: "environment" } },
+          audio: false
+        });
+        webcamElement.srcObject = stream;
+        labelContainer.innerText = "カメラ起動中...";
+        await init();
       } catch (err) {
-        console.warn("環境カメラにアクセスできません。デフォルトを使用します。", err);
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-        video.srcObject = stream;
+        console.error("カメラ起動エラー:", err);
+        labelContainer.innerText = "カメラを起動できませんでした。";
       }
     }
 
-    startBtn.addEventListener('click', startCamera);
+    async function startPrediction() {
+      const loop = async () => {
+        if (model && webcamElement.readyState === 4) {
+          const prediction = await model.predict(webcamElement);
+          prediction.sort((a, b) => b.probability - a.probability);
+          const top = prediction[0];
+          labelContainer.innerHTML = `${top.className}（信頼度 ${(top.probability * 100).toFixed(1)}%）`;
+        }
+        window.requestAnimationFrame(loop);
+      };
+      loop();
+    }
+
+    startButton.addEventListener("click", startCamera);
   </script>
 </body>
 </html>
