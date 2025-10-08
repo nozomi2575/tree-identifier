@@ -1,6 +1,84 @@
-<video id="webcam" autoplay playsinline width="300"></video>
-<script>
-navigator.mediaDevices.getUserMedia({ video: true })
-  .then(stream => document.getElementById('webcam').srcObject = stream)
-  .catch(err => console.error("カメラ起動失敗:", err));
-</script>
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>リアルタイム樹種判別（アウト優先）</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@teachablemachine-image"></script>
+  <style>
+    body { font-family: sans-serif; text-align: center; margin-top: 20px; }
+    video { border: 1px solid black; width: 300px; height: auto; }
+    #label { font-size: 20px; margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <h1>リアルタイム樹種判別（アウト優先）</h1>
+  <video id="webcam" autoplay playsinline></video>
+  <div id="label">判別結果：-</div>
+
+  <script>
+    const webcam = document.getElementById('webcam');
+    let model;
+
+    // カメラ起動関数
+    async function startCameraWithConstraints(constraints) {
+      if (webcam.srcObject) {
+        webcam.srcObject.getTracks().forEach(t => t.stop());
+      }
+      return await navigator.mediaDevices.getUserMedia(constraints);
+    }
+
+    async function startCamera() {
+      // 優先：アウトカメラ（exact指定）
+      try {
+        const stream = await startCameraWithConstraints({
+          video: { facingMode: { exact: "environment" } }
+        });
+        webcam.srcObject = stream;
+        return;
+      } catch (err) {
+        console.warn("exact 環境が使えず（strict 環境優先失敗）:", err);
+      }
+
+      // 次：アウトカメラ優先（exact なし）
+      try {
+        const stream = await startCameraWithConstraints({
+          video: { facingMode: "environment" }
+        });
+        webcam.srcObject = stream;
+        return;
+      } catch (err) {
+        console.warn("facingMode: environment が使えず:", err);
+      }
+
+      // 最後の手段：全部のビデオを許可（ブラウザに選択を任せる）
+      try {
+        const stream = await startCameraWithConstraints({
+          video: true
+        });
+        webcam.srcObject = stream;
+      } catch (err) {
+        console.error("カメラの取得に失敗:", err);
+      }
+    }
+
+    async function init() {
+      const modelURL = "model/model.json";
+      const metadataURL = "model/metadata.json";
+      model = await tmImage.load(modelURL, metadataURL);
+
+      await startCamera();
+
+      setInterval(async () => {
+        if (!webcam.srcObject) return;
+        const prediction = await model.predict(webcam);
+        const best = prediction.reduce((a,b) => a.probability > b.probability ? a : b);
+        document.getElementById('label').innerText =
+          `判別結果：${best.className} (${(best.probability*100).toFixed(1)}%)`;
+      }, 500);
+    }
+
+    init();
+  </script>
+</body>
+</html>
