@@ -1,37 +1,51 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>リアルタイム樹種判別</title>
+  <meta charset="UTF-8">
+  <title>リアルタイム樹種判別（アウトカメラ固定）</title>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
   <script src="https://cdn.jsdelivr.net/npm/@teachablemachine-image"></script>
   <style>
-    video { border: 1px solid black; }
+    body { font-family: sans-serif; text-align: center; margin-top: 20px; }
+    video { border: 1px solid black; width: 300px; height: auto; }
     #label { font-size: 20px; margin-top: 10px; }
   </style>
 </head>
 <body>
-  <h1>リアルタイム樹種判別（アウトカメラ固定）</h1>
-  <video id="webcam" autoplay playsinline width="300"></video>
+  <h1>リアルタイム樹種判別</h1>
+  <video id="webcam" autoplay playsinline></video>
   <div id="label">判別結果：-</div>
 
   <script>
     const webcam = document.getElementById('webcam');
     let model;
 
+    // カメラ起動（アウトカメラ固定 + フォールバック）
     async function startCamera() {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment" } // ここでアウトカメラ固定
-      });
-      webcam.srcObject = stream;
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { exact: "environment" } }
+        });
+        webcam.srcObject = stream;
+      } catch (err) {
+        console.warn("アウトカメラが使用できません。フロントカメラを使用します。", err);
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "user" }
+        });
+        webcam.srcObject = stream;
+      }
     }
 
     async function init() {
+      // Teachable Machine モデルのロード
       const modelURL = "model/model.json";        
       const metadataURL = "model/metadata.json";
       model = await tmImage.load(modelURL, metadataURL);
 
+      // カメラ起動
       await startCamera();
 
+      // 0.5秒ごとに判別
       setInterval(async () => {
         const prediction = await model.predict(webcam);
         const best = prediction.reduce((a,b) => a.probability > b.probability ? a : b);
