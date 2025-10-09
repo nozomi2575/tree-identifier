@@ -45,8 +45,8 @@
     let model;
 
     async function init() {
-      // 🔸 あなたのTeachable MachineモデルURLをここに貼る
-      const URL = "https://teachablemachine.withgoogle.com/models/YOUR_MODEL_ID/";
+      // 🔸 あなたのTeachable MachineモデルURLをここに貼ってください
+      const URL = "https://teachablemachine.withgoogle.com/models/YOUR_MODEL_ID/"; // ← 必ず修正！
       const modelURL = URL + "model.json";
       const metadataURL = URL + "metadata.json";
 
@@ -58,17 +58,18 @@
 
     async function startCamera() {
       try {
-        // ✅ Android Chrome ならこの設定でアウトカメラ起動
+        // ✅ 修正ポイント：facingMode を柔軟に設定
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { exact: "environment" } },
+          video: { facingMode: "environment" }, // ← ここを修正済み
           audio: false
         });
+
         webcamElement.srcObject = stream;
         labelContainer.innerText = "カメラ起動中...";
         await init();
       } catch (err) {
         console.error("カメラ起動エラー:", err);
-        labelContainer.innerText = "カメラを起動できませんでした。";
+        labelContainer.innerText = "カメラを起動できませんでした。別のブラウザや端末でお試しください。";
       }
     }
 
@@ -89,3 +90,5 @@
   </script>
 </body>
 </html>
+
+
