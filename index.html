@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>樹種判別アプリ（Android対応）</title>
+  <title>樹種判別アプリ（カメラ選択対応）</title>
   <style>
     body {
       font-family: sans-serif;
@@ -22,7 +22,7 @@
       font-size: 1.2em;
       margin-top: 15px;
     }
-    button {
+    button, select {
       margin-top: 10px;
       padding: 10px 20px;
       font-size: 1em;
@@ -30,10 +30,12 @@
   </style>
 </head>
 <body>
-  <h2>🌲 樹種判別アプリ（Android Chrome対応）</h2>
+  <h2>🌲 樹種判別アプリ（カメラ選択対応）</h2>
+
+  <select id="camera-select"></select><br>
+  <button id="start-btn">選んだカメラで起動</button><br>
   <video id="webcam" autoplay playsinline muted></video>
   <div id="label-container">カメラ準備中...</div>
-  <button id="start-btn">カメラ起動</button>
 
   <script type="module">
     import * as tmImage from "https://teachablemachine.withgoogle.com/tfjs-models/image.min.js";
@@ -41,27 +43,31 @@
     const webcamElement = document.getElementById("webcam");
     const labelContainer = document.getElementById("label-container");
     const startButton = document.getElementById("start-btn");
+    const cameraSelect = document.getElementById("camera-select");
 
     let model;
 
-    async function init() {
-      // 🔸 あなたのTeachable MachineモデルURLをここに貼ってください（例を下に記載）
-      const URL = "https://teachablemachine.withgoogle.com/models/YOUR_MODEL_ID/";  // ← ← ← ※ここを必ず自分のURLに書き換えて！
-      const modelURL = URL + "model.json";
-      const metadataURL = URL + "metadata.json";
+    // 🔁 利用可能なカメラを取得してセレクトに追加
+    async function getCameras() {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videoDevices = devices.filter(device => device.kind === 'videoinput');
 
-      model = await tmImage.load(modelURL, metadataURL);
-      labelContainer.innerHTML = "カメラ準備OK。樹種を判別します...";
-
-      startPrediction();
+      cameraSelect.innerHTML = ""; // 一度クリア
+      videoDevices.forEach((device, index) => {
+        const option = document.createElement("option");
+        option.value = device.deviceId;
+        option.text = device.label || `カメラ ${index + 1}`;
+        cameraSelect.appendChild(option);
+      });
     }
 
+    // 📷 カメラを起動する（ユーザーが選んだ deviceId を使う）
     async function startCamera() {
+      const selectedDeviceId = cameraSelect.value;
+
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: { ideal: "environment" }  // ✅ 背面カメラを優先的に起動
-          },
+          video: { deviceId: { exact: selectedDeviceId } },
           audio: false
         });
 
@@ -70,8 +76,20 @@
         await init();
       } catch (err) {
         console.error("カメラ起動エラー:", err);
-        labelContainer.innerText = "カメラを起動できませんでした。ブラウザや端末の設定をご確認ください。";
+        labelContainer.innerText = "カメラを起動できませんでした。";
       }
+    }
+
+    // 🤖 Teachable Machine モデルを読み込んで判別開始
+    async function init() {
+      // 🔸あなたのTeachable Machine モデルURLに書き換えてください！
+      const URL = "https://teachablemachine.withgoogle.com/models/YOUR_MODEL_ID/"; // ←修正必須！
+      const modelURL = URL + "model.json";
+      const metadataURL = URL + "metadata.json";
+
+      model = await tmImage.load(modelURL, metadataURL);
+      labelContainer.innerHTML = "カメラ準備OK。樹種を判別します...";
+      startPrediction();
     }
 
     async function startPrediction() {
@@ -87,11 +105,14 @@
       loop();
     }
 
+    // 📅 イベント登録
     startButton.addEventListener("click", startCamera);
+
+    // ページ読み込み時にカメラ一覧を取得
+    getCameras();
   </script>
 </body>
 </html>
-
 
 
 
